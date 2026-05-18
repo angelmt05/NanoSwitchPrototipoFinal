@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanoSwitch - Control de Usuarios</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@700&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains+Mono', monospace; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+        
+        .controller-bg { background-color: #455460; border-color: #333f48; }
+        .screen-border { border-color: #2d373f; }
+        .button-shadow { box-shadow: inset 0 4px 10px rgba(0,0,0,0.6), 0 8px 15px rgba(0,0,0,0.4); }
+        
+        /* Dagiti Animasion */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .animate-slide-up { animation: slideUp 0.3s ease-out forwards; }
+
+        /* Animasion no agkamali (Shake) */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        .animate-shake { animation: shake 0.3s ease-in-out; }
+
+        .user-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        
+        /* Numpad a naikapet */
+        .inline-numpad-btn { 
+            background: #f8fafc; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 1rem; 
+            font-weight: 800; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s;
+        }
+        .inline-numpad-btn:active { transform: scale(0.92); background: #f1f5f9; border-color: #cbd5e1; }
+        
+        /* Estilo ti Teclado a Switch */
+        .kb-key {
+            background: #4a4a4a;
+            color: white;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 22px; 
+            height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.1s;
+            cursor: pointer;
+        }
+        .kb-key:active { background: #666; transform: scale(0.95); }
+        .kb-key-special { background: #333; font-size: 16px; text-transform: uppercase; border: 1px solid #444; }
+        .kb-key-confirm { background: #1a73e8; border: none; }
+        
+        /* Kurson nga agkikidem */
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .cursor-active {
+            border-right: 3px solid #1a73e8;
+            animation: blink 1s infinite;
+            display: inline-block;
+            height: 1.2em;
+            vertical-align: middle;
+            margin-left: -1.5px;
+            margin-right: -1.5px;
+        }
+
+        /* --- Estilo ti Escáner --- */
+        @keyframes scanLaser {
+            0%, 100% { top: 0%; opacity: 0; }
+            10%, 90% { opacity: 1; }
+            50% { top: 100%; }
+        }
+        .scan-line {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #22d3ee; 
+            box-shadow: 0 0 10px #22d3ee, 0 0 20px #22d3ee;
+            animation: scanLaser 2.5s ease-in-out infinite;
+        }
+        .scanner-frame {
+            box-shadow: inset 0 0 0 2px rgba(34, 211, 238, 0.2);
+        }
+
+        /* --- Estilo ti Holograma a Pagsubli --- */
+        @keyframes hologramGrow {
+            0% { transform: scale(0.5); opacity: 0.3; }
+            100% { transform: scale(var(--target-scale, 2.5)); opacity: 0.85; }
+        }
+        .animate-hologram {
+            animation: hologramGrow 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            filter: drop-shadow(0 0 15px rgba(34, 197, 94, 0.8));
+        }
+    </style>
+</head>
+<body class="bg-slate-300 min-h-screen flex items-center justify-center p-4">
+
+    <!-- KANGRUNAAN A NAGYANAN -->
+    <div class="relative w-full max-w-5xl rounded-[4rem] p-4 md:p-12 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] flex flex-col items-center border-[4px] controller-bg">
+        
+        <div class="absolute -top-6 left-1/4 w-20 h-8 bg-[#333f48] rounded-t-2xl shadow-lg"></div>
+        <div class="absolute -top-6 right-1/4 w-20 h-8 bg-[#333f48] rounded-t-2xl shadow-lg"></div>
+
+        <div class="w-full flex flex-col md:flex-row items-stretch gap-8">
+            
+            <!-- KANNIGID A PASET -->
+            <div class="flex-none flex flex-col items-center justify-center gap-6 px-4">
+                <div class="text-white/20 uppercase text-sm font-bold tracking-widest mb-2">Nano Zoom</div>
+                <button onclick="handleAction('minimize')" class="w-24 h-24 rounded-full bg-[#333f48] button-shadow transition-all flex items-center justify-center group active:translate-y-1">
+                    <div class="w-16 h-16 rounded-full bg-[#455460] border-2 border-slate-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-minimize text-5xl text-cyan-400"></i>
+                    </div>
+                </button>
+                <span class="text-slate-400 text-sm font-bold uppercase tracking-wider">Minimizar</span>
+                
+                <!-- Botón + oculto para mantener la alineación del botón minimizar -->
+                <div class="mt-8 w-14 h-14 invisible"></div>
+            </div>
+
+            <!-- TENGA A SCREEN -->
+            <div class="flex-1 bg-black rounded-[2.5rem] p-3 shadow-inner border-[12px] screen-border relative overflow-hidden aspect-[16/10] min-h-[500px]">
+                <div id="screen" class="w-full h-full rounded-2xl flex flex-col overflow-hidden relative transition-all duration-700 bg-black">
+                    
+                    <div id="view-off" class="w-full h-full flex flex-col items-center justify-center relative">
+                        <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none rounded-2xl"></div>
+                        <i class="fa-solid fa-bolt text-7xl text-slate-800 opacity-10"></i>
+                    </div>
+
+                    <!-- BUYA A PANAGSANGBAY -->
+                    <div id="view-welcome" class="hidden h-full flex flex-col bg-slate-50 animate-fade-in p-8 rounded-2xl">
+                        <div class="text-center mb-8">
+                            <h1 class="text-4xl font-extrabold text-slate-800 tracking-tight">Bienvenido</h1>
+                            <p class="text-slate-400 text-xl mt-2">Selecciona un perfil para continuar</p>
+                        </div>
+                        <div id="users-grid" class="flex-1 grid grid-cols-2 gap-4 overflow-y-auto custom-scrollbar p-2"></div>
+                        <button onclick="prepareUserForm(false)" class="mt-6 w-full py-4 bg-white hover:bg-slate-100 text-slate-800 font-bold rounded-2xl transition-colors border-2 border-slate-200 uppercase tracking-widest text-base shadow-sm">
+                            Nuevo Usuario
+                        </button>
+                    </div>
+
+                    <!-- BUYA TI PIN -->
+                    <div id="view-pin" class="hidden h-full flex flex-col bg-white animate-fade-in p-4 rounded-2xl">
+                        <div class="relative flex items-center justify-center mb-2 flex-none">
+                            <button onclick="showView('welcome')" class="absolute left-2 text-slate-400 hover:text-slate-800">
+                                <i class="fa-solid fa-arrow-left text-2xl"></i>
+                            </button>
+                            <h2 id="pin-user-name" class="text-2xl font-bold text-slate-800">Usuario</h2>
+                        </div>
+                        <div id="pin-container" class="flex flex-col items-center mb-4 flex-none">
+                            <div class="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white mb-3">
+                                <i class="fa-solid fa-lock text-xl"></i>
+                            </div>
+                            <div id="pin-dots-display" class="flex gap-4">
+                                <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                                <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                                <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                                <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                            </div>
+                        </div>
+                        <div class="flex-1 flex flex-col justify-center pb-4">
+                            <div class="grid grid-cols-3 gap-2 px-8 max-w-[280px] mx-auto w-full">
+                                <button onclick="numpadPressPIN('1')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">1</button>
+                                <button onclick="numpadPressPIN('2')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">2</button>
+                                <button onclick="numpadPressPIN('3')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">3</button>
+                                <button onclick="numpadPressPIN('4')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">4</button>
+                                <button onclick="numpadPressPIN('5')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">5</button>
+                                <button onclick="numpadPressPIN('6')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">6</button>
+                                <button onclick="numpadPressPIN('7')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">7</button>
+                                <button onclick="numpadPressPIN('8')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">8</button>
+                                <button onclick="numpadPressPIN('9')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">9</button>
+                                <div class="w-full h-full"></div>
+                                <button onclick="numpadPressPIN('0')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">0</button>
+                                <button onclick="numpadPressPIN('DEL')" class="inline-numpad-btn h-12 md:h-14 text-red-500 shadow-sm">
+                                    <i class="fa-solid fa-delete-left text-2xl md:text-3xl"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BUYA TI PORMULARIO TI USAR -->
+                    <div id="view-user-form" class="hidden h-full flex flex-col bg-white animate-fade-in p-6 overflow-y-auto custom-scrollbar rounded-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <button onclick="cancelUserForm()" class="text-slate-400 hover:text-slate-800 transition-colors">
+                                <i class="fa-solid fa-arrow-left text-3xl"></i>
+                            </button>
+                            <h2 id="user-form-title" class="text-3xl font-extrabold text-slate-800 text-center flex-1">Perfil</h2>
+                            <div class="w-8"></div>
+                        </div>
+                        <div class="space-y-4 mb-4">
+                            <div>
+                                <label class="text-sm font-bold text-slate-400 uppercase mb-1.5 block tracking-widest">Nombre</label>
+                                <input readonly onclick="openKeyboardPopup('user-form-name')" type="text" id="user-form-name" placeholder="Nombre..." class="cursor-pointer w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-bold outline-none focus:ring-2 ring-slate-100 text-lg">
+                            </div>
+                            <div>
+                                <label class="text-sm font-bold text-slate-400 uppercase mb-1.5 block tracking-widest">PIN de acceso</label>
+                                <div id="form-pin-dots-container" onclick="openFormPinNumpad()" class="cursor-pointer flex gap-4 justify-center items-center bg-slate-50 border border-slate-200 rounded-xl py-4 hover:bg-slate-100 transition-all active:scale-95 shadow-sm">
+                                    <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                                    <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                                    <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                                    <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-sm font-bold text-slate-400 uppercase mb-1.5 block tracking-widest">Avatar</label>
+                                <div id="user-avatar-grid" class="grid grid-cols-6 gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 max-h-24 overflow-y-auto custom-scrollbar"></div>
+                            </div>
+                        </div>
+                        <button id="user-form-submit" class="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl shadow-xl hover:bg-slate-800 transition-all uppercase tracking-widest text-base mt-auto">
+                            Guardar Perfil
+                        </button>
+                    </div>
+
+                    <!-- BUYA TI PANEL TI KONTROL -->
+                    <div id="view-dashboard" class="hidden h-full flex flex-col bg-slate-50 animate-fade-in rounded-2xl">
+                        <div class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-none z-10">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-bolt text-slate-800 text-2xl"></i>
+                                <span class="font-bold text-2xl tracking-tight text-slate-800">
+                                    Nano<span style="color: #4783B4">Switch</span>
+                                </span>
+                                <span id="current-user-tag" class="ml-2 px-2 py-0.5 bg-slate-100 rounded text-xs font-bold text-slate-500 uppercase tracking-tighter border border-slate-200">User</span>
+                            </div>
+                            <div class="flex items-center gap-2 relative">
+                                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)] mr-2"></div>
+                                <button onclick="toggleUserMenu()" class="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
+                                    <i class="fa-solid fa-bars text-2xl"></i>
+                                </button>
+                                <div id="user-dropdown" class="hidden absolute top-12 right-0 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-30">
+                                    <button onclick="editCurrentUser()" class="w-full text-left px-5 py-3.5 text-base font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50">
+                                        <i class="fa-solid fa-user-pen text-slate-400"></i> Editar Usuario
+                                    </button>
+                                    <button onclick="confirmDeleteUser()" class="w-full text-left px-5 py-3.5 text-base font-bold text-red-500 hover:bg-red-50 flex items-center gap-3 border-b border-slate-50">
+                                        <i class="fa-solid fa-user-xmark text-red-300"></i> Eliminar Usuario
+                                    </button>
+                                    <button onclick="logout()" class="w-full text-left px-5 py-3.5 text-base font-bold text-slate-400 hover:bg-slate-50 flex items-center gap-3">
+                                        <i class="fa-solid fa-power-off"></i> Cerrar Sesión
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="objects-grid" class="flex-1 overflow-y-auto custom-scrollbar p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 content-start"></div>
+                        <div id="status-bar" class="bg-slate-900 text-white px-6 py-3 flex items-center justify-between text-sm font-bold tracking-widest uppercase flex-none">
+                            <button onclick="toggleAddView(true)" class="text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1.5 text-sm">
+                                <i class="fa-solid fa-plus"></i> AÑADIR OBJETO
+                            </button>
+                            <button onclick="confirmDeleteObject()" class="text-red-400 hover:text-red-300 transition-colors flex items-center gap-1.5 text-sm">
+                                <i class="fa-solid fa-trash-can"></i> ELIMINAR
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- BUYA A PANGNAYON TI BANAG -->
+                    <div id="add-view" class="hidden absolute inset-0 bg-white z-20 flex flex-col animate-slide-up rounded-2xl">
+                        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-none bg-slate-50">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
+                                    <i class="fa-solid fa-plus text-xl"></i>
+                                </div>
+                                <h2 class="font-bold text-slate-800 text-2xl tracking-tight">Añadir Objeto</h2>
+                            </div>
+                            <button onclick="toggleAddView(false)" class="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                                <i class="fa-solid fa-xmark text-2xl"></i>
+                            </button>
+                        </div>
+                        <div class="flex-1 flex flex-col p-6 overflow-hidden">
+                            <div class="grid grid-cols-1 gap-4 mb-6 flex-none">
+                                <div>
+                                    <label class="text-sm font-bold text-slate-400 uppercase mb-1.5 block tracking-widest">Identificador</label>
+                                    <input readonly onclick="openKeyboardPopup('new-name')" type="text" id="new-name" placeholder="Nombre..." class="cursor-pointer w-full bg-slate-100 rounded-xl px-4 py-3 text-lg font-semibold outline-none focus:ring-2 ring-slate-300 border border-slate-200">
+                                </div>
+                            </div>
+                            <div id="emoji-grid" class="flex-1 overflow-y-auto custom-scrollbar bg-slate-100 rounded-xl p-3 grid grid-cols-6 gap-2 border border-slate-200 mb-6"></div>
+                            <button onclick="openScannerPopup()" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl flex items-center justify-center gap-2 text-base uppercase tracking-widest">
+                                <i class="fa-solid fa-qrcode text-xl"></i> Escanear Objeto
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- POPUP TI ESCÁNER TI KAMARA -->
+                    <div id="scanner-overlay" class="hidden absolute inset-0 bg-slate-900/95 backdrop-blur-md z-[75] flex flex-col items-center justify-center p-4 animate-fade-in rounded-2xl">
+                        <div class="text-center mb-6">
+                            <h3 class="text-white font-black tracking-widest uppercase text-xl mb-1">Escáner Molecular</h3>
+                            <p id="scanner-status" class="text-cyan-400 text-sm uppercase font-bold animate-pulse">Analizando estructura... 10s</p>
+                        </div>
+                        
+                        <div class="relative w-full max-w-[360px] aspect-square bg-black rounded-[2rem] overflow-hidden scanner-frame mb-8 flex items-center justify-center shadow-[0_0_40px_rgba(34,211,238,0.2)]">
+                            <!-- Elemento de video para la cámara real -->
+                            <video id="scanner-video" class="absolute inset-0 w-full h-full object-cover" autoplay playsinline></video>
+                            
+                            <!-- Overlay oscuro y línea de escaneo -->
+                            <div class="absolute inset-0 bg-cyan-900/20 mix-blend-color z-10 pointer-events-none"></div>
+                            <div class="scan-line z-20 pointer-events-none"></div>
+                            
+                            <!-- Esquinas de enfoque estilo UI sci-fi -->
+                            <div class="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-cyan-400 rounded-tl-xl z-20 pointer-events-none"></div>
+                            <div class="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-cyan-400 rounded-tr-xl z-20 pointer-events-none"></div>
+                            <div class="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-cyan-400 rounded-bl-xl z-20 pointer-events-none"></div>
+                            <div class="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-cyan-400 rounded-br-xl z-20 pointer-events-none"></div>
+                        </div>
+
+                        <div class="flex w-full max-w-[360px]">
+                            <button onclick="closeScannerPopup()" class="w-full bg-slate-800 text-slate-300 py-3.5 rounded-2xl font-bold hover:bg-slate-700 transition-all text-sm uppercase tracking-widest border border-slate-700">Cancelar</button>
+                        </div>
+                    </div>
+
+                    <!-- POPUP A PANANGISUBLI (KAMARA) -->
+                    <div id="restore-overlay" class="hidden absolute inset-0 bg-slate-900/95 backdrop-blur-md z-[75] flex flex-col items-center justify-center p-4 animate-fade-in rounded-2xl">
+                        <div class="text-center mb-6">
+                            <h3 class="text-white font-black tracking-widest uppercase text-xl mb-1">Proyección de Masa</h3>
+                            <p class="text-green-400 text-sm uppercase font-bold animate-pulse">Calculando volumen espacial...</p>
+                        </div>
+                        
+                        <div class="relative w-full max-w-[360px] aspect-square bg-black rounded-[2rem] overflow-hidden border-2 border-green-500/30 mb-8 flex items-center justify-center shadow-[0_0_40px_rgba(34,197,94,0.2)]">
+                            <!-- Elemento de video para la cámara real -->
+                            <video id="restore-video" class="absolute inset-0 w-full h-full object-cover" autoplay playsinline></video>
+                            
+                            <!-- Overlay oscuro -->
+                            <div class="absolute inset-0 bg-green-900/20 mix-blend-color z-10 pointer-events-none"></div>
+                            
+                            <!-- Holograma proyectado -->
+                            <div class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                                <div id="restore-hologram" class="text-7xl mb-4">📦</div>
+                            </div>
+                            
+                            <!-- Esquinas de enfoque estilo UI sci-fi -->
+                            <div class="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-green-400 rounded-tl-xl z-20 pointer-events-none"></div>
+                            <div class="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-green-400 rounded-tr-xl z-20 pointer-events-none"></div>
+                            <div class="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-green-400 rounded-bl-xl z-20 pointer-events-none"></div>
+                            <div class="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-green-400 rounded-br-xl z-20 pointer-events-none"></div>
+                        </div>
+
+                        <div class="flex gap-4 w-full max-w-[360px]">
+                            <button onclick="closeRestorePopup()" class="flex-1 bg-slate-800 text-slate-300 py-3.5 rounded-2xl font-bold hover:bg-slate-700 transition-all text-sm uppercase tracking-widest border border-slate-700">Cancelar</button>
+                            <button onclick="confirmRestore()" class="flex-1 bg-green-500 text-white py-3.5 rounded-2xl font-bold hover:bg-green-400 transition-all text-sm uppercase tracking-widest flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(34,197,94,0.4)]">
+                                Restaurar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- POPUP NUMPAD (MASA) ITI INTERO A SCREEN -->
+                    <div id="numpad-overlay" class="hidden absolute inset-0 bg-white z-[85] flex flex-col animate-slide-up rounded-2xl p-4">
+                        <div class="relative flex items-center justify-center mb-2 flex-none">
+                            <button onclick="closeNumpadPopup()" class="absolute left-2 text-slate-400 hover:text-slate-800 transition-colors">
+                                <i class="fa-solid fa-arrow-left text-2xl"></i>
+                            </button>
+                            <h2 class="font-bold text-slate-800 text-2xl tracking-tight">Masa (KG)</h2>
+                        </div>
+                        <div class="flex flex-col items-center mb-2 flex-none">
+                            <div id="numpad-display" class="w-full max-w-[280px] bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-2 text-right text-4xl font-bold text-slate-800 mono h-14 flex items-center justify-end shadow-inner">0</div>
+                        </div>
+                        <div class="flex-1 flex flex-col justify-center pb-4">
+                            <div class="grid grid-cols-3 gap-2 px-8 max-w-[280px] mx-auto w-full">
+                                <button onclick="numpadPopupPress('1')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">1</button>
+                                <button onclick="numpadPopupPress('2')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">2</button>
+                                <button onclick="numpadPopupPress('3')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">3</button>
+                                <button onclick="numpadPopupPress('4')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">4</button>
+                                <button onclick="numpadPopupPress('5')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">5</button>
+                                <button onclick="numpadPopupPress('6')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">6</button>
+                                <button onclick="numpadPopupPress('7')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">7</button>
+                                <button onclick="numpadPopupPress('8')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">8</button>
+                                <button onclick="numpadPopupPress('9')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">9</button>
+                                <button onclick="numpadPopupPress('.')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl font-black shadow-sm pb-2">.</button>
+                                <button onclick="numpadPopupPress('0')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">0</button>
+                                <button onclick="numpadPopupPress('DEL')" class="inline-numpad-btn h-12 md:h-14 text-red-500 shadow-sm"><i class="fa-solid fa-delete-left text-2xl md:text-3xl"></i></button>
+                                <button onclick="confirmNumpadPopup()" class="col-span-3 h-12 md:h-14 bg-slate-900 text-white rounded-xl font-bold uppercase text-lg tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center mt-2">OK</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- POPUP PORMULARIO PIN ITI INTERO A SCREEN -->
+                    <div id="form-pin-overlay" class="hidden absolute inset-0 bg-white z-[85] flex flex-col animate-slide-up rounded-2xl p-4">
+                        <div class="relative flex items-center justify-center mb-2 flex-none">
+                            <button onclick="closeFormPinNumpad()" class="absolute left-2 text-slate-400 hover:text-slate-800 transition-colors">
+                                <i class="fa-solid fa-arrow-left text-2xl"></i>
+                            </button>
+                            <h2 class="font-bold text-slate-800 text-2xl tracking-tight">Establecer PIN</h2>
+                        </div>
+                        <div class="flex flex-col items-center mb-4 flex-none">
+                            <div class="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white mb-3 shadow-md">
+                                <i class="fa-solid fa-lock text-xl"></i>
+                            </div>
+                            <div id="form-pin-overlay-dots" class="flex gap-4">
+                                <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                                <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                                <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                                <div class="w-3 h-3 rounded-full bg-slate-200 transition-colors"></div>
+                            </div>
+                        </div>
+                        <div class="flex-1 flex flex-col justify-center pb-4">
+                            <div class="grid grid-cols-3 gap-2 px-8 max-w-[280px] mx-auto w-full">
+                                <button onclick="numpadPressForm('1')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">1</button>
+                                <button onclick="numpadPressForm('2')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">2</button>
+                                <button onclick="numpadPressForm('3')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">3</button>
+                                <button onclick="numpadPressForm('4')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">4</button>
+                                <button onclick="numpadPressForm('5')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">5</button>
+                                <button onclick="numpadPressForm('6')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">6</button>
+                                <button onclick="numpadPressForm('7')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">7</button>
+                                <button onclick="numpadPressForm('8')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">8</button>
+                                <button onclick="numpadPressForm('9')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">9</button>
+                                <button onclick="closeFormPinNumpad()" class="inline-numpad-btn h-12 md:h-14 text-lg md:text-xl font-black text-blue-500 shadow-sm uppercase bg-slate-100 hover:bg-slate-200">OK</button>
+                                <button onclick="numpadPressForm('0')" class="inline-numpad-btn h-12 md:h-14 text-3xl md:text-4xl shadow-sm">0</button>
+                                <button onclick="numpadPressForm('DEL')" class="inline-numpad-btn h-12 md:h-14 text-red-500 shadow-sm"><i class="fa-solid fa-delete-left text-2xl md:text-3xl"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TECLADO TEXTO ESTILO SWITCH -->
+                    <div id="keyboard-overlay" class="hidden absolute inset-0 bg-[#2d2d2d] z-[80] flex flex-col p-4 animate-fade-in rounded-2xl">
+                        <div class="flex items-center justify-between mb-2 border-b border-white/10 pb-2">
+                            <div class="flex flex-col flex-1">
+                                <span class="text-sm font-bold text-slate-500 uppercase tracking-widest">Introducir texto</span>
+                                <div id="keyboard-display-container" class="text-4xl font-bold text-white mono mt-1 flex flex-wrap min-h-[1.5em] tracking-wider pointer-events-none"></div>
+                            </div>
+                            <button onclick="closeKeyboardPopup()" class="text-slate-400 hover:text-white ml-4"><i class="fa-solid fa-circle-xmark text-4xl"></i></button>
+                        </div>
+                        
+                        <div id="keyboard-grid" class="flex-1 grid grid-cols-10 gap-1 content-start"></div>
+
+                        <div class="grid grid-cols-12 gap-1 mt-2">
+                            <button onclick="toggleKeyboardCase()" id="kb-shift-btn" class="col-span-1 kb-key kb-key-special p-0 flex items-center justify-center transition-all duration-200">
+                                <svg id="kb-shift-icon" viewBox="0 0 100 100" class="w-6 h-6" fill="currentColor">
+                                    <polygon points="50,5 95,50 70,50 70,95 30,95 30,50 5,50" />
+                                </svg>
+                            </button>
+                            <button onclick="moveCursor('left')" class="col-span-1 kb-key kb-key-special">
+                                <i class="fa-solid fa-chevron-left text-xl"></i>
+                            </button>
+                            <button onclick="keyboardPress(' ')" class="col-span-5 kb-key kb-key-special">Espacio</button>
+                            <button onclick="moveCursor('right')" class="col-span-1 kb-key kb-key-special">
+                                <i class="fa-solid fa-chevron-right text-xl"></i>
+                            </button>
+                            <button onclick="keyboardPress('DEL')" class="col-span-2 kb-key kb-key-special text-red-300">
+                                <i class="fa-solid fa-delete-left text-2xl"></i>
+                            </button>
+                            <button onclick="confirmKeyboard()" class="col-span-2 kb-key kb-key-confirm text-sm font-black uppercase">OK</button>
+                        </div>
+                    </div>
+
+                    <!-- MODAL PARA KADAGITI ALERTO -->
+                    <div id="modal-confirm" class="hidden absolute inset-0 bg-slate-900/60 backdrop-blur-[4px] z-[90] flex items-center justify-center p-4 rounded-2xl">
+                        <div class="bg-white w-full max-w-[300px] rounded-[2.5rem] p-8 shadow-2xl text-center">
+                            <div id="modal-icon-container" class="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 mx-auto">
+                                <i id="modal-icon" class="fa-solid text-5xl"></i>
+                            </div>
+                            <h3 id="modal-title" class="font-bold text-slate-800 text-2xl mb-2">Título</h3>
+                            <p id="modal-desc" class="text-base text-slate-500 mb-8 leading-relaxed">Descripción</p>
+                            <div class="flex flex-col gap-2">
+                                <button id="modal-primary-btn" class="w-full text-white py-3.5 rounded-2xl font-bold text-base shadow-lg">Confirmar</button>
+                                <button id="modal-cancel-btn" onclick="closeModal()" class="w-full bg-slate-100 text-slate-500 py-3.5 rounded-2xl font-bold text-base">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- KANNAWAN A PASET -->
+            <div class="flex-none flex flex-col items-center justify-center gap-6 px-4">
+                <div class="text-white/20 uppercase text-sm font-bold tracking-widest mb-2">Mega Scale</div>
+                <button onclick="handleAction('maximize')" class="w-24 h-24 rounded-full bg-[#333f48] button-shadow transition-all flex items-center justify-center group active:translate-y-1">
+                    <div class="w-16 h-16 rounded-full bg-[#455460] border-2 border-slate-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-maximize text-5xl text-green-400"></i>
+                    </div>
+                </button>
+                <span class="text-slate-400 text-sm font-bold uppercase tracking-wider">Restaurar</span>
+                <div class="mt-8 flex flex-col items-center gap-2">
+                    <button id="power-button" onclick="togglePower()" class="w-16 h-16 rounded-full border-[2px] bg-[#1a2126] border-black/40 flex items-center justify-center transition-all duration-300 relative active:scale-95 shadow-[0_6px_10px_rgba(0,0,0,0.4)]">
+                        <i class="fa-solid fa-power-off text-4xl text-white/20 transition-colors duration-300" id="power-icon"></i>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="mt-12 flex gap-4">
+            <div class="indicator w-2 h-2 rounded-full bg-black/30 shadow-inner"></div>
+            <div class="indicator w-2 h-2 rounded-full bg-black/30 shadow-inner"></div>
+            <div class="indicator w-2 h-2 rounded-full bg-black/30 shadow-inner"></div>
+            <div class="indicator w-2 h-2 rounded-full bg-black/30 shadow-inner"></div>
+            <div class="indicator w-2 h-2 rounded-full bg-black/30 shadow-inner"></div>
+            <div class="indicator w-2 h-2 rounded-full bg-black/30 shadow-inner"></div>
+            <div class="indicator w-2 h-2 rounded-full bg-black/30 shadow-inner"></div>
+            <div class="indicator w-2 h-2 rounded-full bg-black/30 shadow-inner"></div>
+        </div>
+    </div>
+
+    <script>
+        let isOn = false;
+        let currentUser = null;
+        let loginTargetUser = null;
+        let selectedId = null;
+        let currentIcon = '📦';
+        let currentFormAvatar = '👤';
+        let isEditing = false;
+        let cameraStream = null; 
+        let scannerTimeout = null;
+        let scannerInterval = null;
+        let objectToRestore = null;
+
+        const MASS_REDUCTION_FACTOR = 0.001;
+
+        let currentPinInput = "";
+        let currentFormPinInput = "";
+        let numpadPopupTargetId = '';
+        let numpadPopupValue = '';
+        
+        let keyboardTargetId = '';
+        let keyboardValue = '';
+        let keyboardCursorPos = 0;
+        let isKeyboardUppercase = true;
+
+        let users = [
+            { 
+                id: 1, 
+                name: 'Harry', 
+                pin: '1111', 
+                avatar: '🧙‍♂️',
+                items: [
+                    { id: 1, name: "Bicicleta de Montaña", isMinimized: true, originalMass: 14.5, icon: "🚲" },
+                    { id: 2, name: "Sofá de Cuero", isMinimized: true, originalMass: 85, icon: "🛋️" },
+                    { id: 3, name: "Guitarra Eléctrica", isMinimized: false, originalMass: 3.8, icon: "🎸" },
+                    { id: 4, name: "Coche Deportivo", isMinimized: true, originalMass: 1500, icon: "🚗" },
+                ]
+            }
+        ];
+
+        const EMOJI_LIBRARY = ['🚗','🚲','🛋️','🎸','📦','📱','💻','🏠','🎮','🍕','🔋','💡','📷','🔑','👕','🎒','👟','🕶️','🎻','🥁','🎹','🛠️','🧪','🔬'];
+        
+        // Diccionario con baremos de masa [mínimo, máximo] en KG para cada emoji
+        const emojiMassRanges = {
+            '🚗': [1000, 2500],
+            '🚲': [10, 20],
+            '🛋️': [30, 100],
+            '🎸': [3, 6],
+            '📦': [1, 25],
+            '📱': [0.15, 0.3],
+            '💻': [1, 3],
+            '🏠': [50000, 150000],
+            '🎮': [0.2, 0.5],
+            '🍕': [0.4, 1.2],
+            '🔋': [0.05, 0.2],
+            '💡': [0.05, 0.1],
+            '📷': [0.5, 2],
+            '🔑': [0.01, 0.05],
+            '👕': [0.1, 0.4],
+            '🎒': [0.5, 6],
+            '👟': [0.3, 1],
+            '🕶️': [0.05, 0.15],
+            '🎻': [0.4, 0.7],
+            '🥁': [5, 25],
+            '🎹': [150, 400],
+            '🛠️': [1, 10],
+            '🧪': [0.05, 0.3],
+            '🔬': [2, 8]
+        };
+
+        const AVATAR_LIBRARY = ['👤','🧙‍♂️','👩‍🚀','🕵️','👷','🤴','👸','👩‍🔬','👨‍🎨','🧛','🧟','🐶','🐱','🦁','🐼','🦄','🦊','🦖'];
+        const KB_CHARS = "1234567890QWERTYUIOPASDFGHJKLÑZXCVBNM.,-".split("");
+
+        function showView(viewId) {
+            const views = ['off', 'welcome', 'pin', 'user-form', 'dashboard'];
+            views.forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if(el) el.classList.toggle('hidden', v !== viewId);
+            });
+            if(viewId === 'welcome') renderUserCards();
+            if(viewId === 'dashboard') renderObjects();
+            if(viewId === 'user-form') renderAvatarGrid();
+            if(viewId === 'pin') {
+                currentPinInput = "";
+                updatePinDots('pin-dots-display', "");
+                document.getElementById('pin-container').classList.remove('animate-shake');
+            }
+        }
+
+        // --- LÓGICA ESCÁNER (CÁMARA) ---
+        async function openScannerPopup() {
+            const name = document.getElementById('new-name').value;
+            
+            if (!name) {
+                showModal('Datos inválidos', 'Introduce el identificador del objeto.', 'fa-circle-exclamation', 'bg-amber-50', 'text-amber-500', 'bg-amber-500', closeModal, 'Entendido');
+                return;
+            }
+
+            document.getElementById('scanner-overlay').classList.remove('hidden');
+            const statusText = document.getElementById('scanner-status');
+            
+            let timeLeft = 10;
+            statusText.innerText = `Calculando masa y estructura... ${timeLeft}s`;
+            statusText.classList.add('text-cyan-400', 'animate-pulse');
+            statusText.classList.remove('text-green-400');
+
+            if (scannerInterval) clearInterval(scannerInterval);
+            scannerInterval = setInterval(() => {
+                timeLeft--;
+                if (timeLeft > 0) {
+                    statusText.innerText = `Calculando masa y estructura... ${timeLeft}s`;
+                } else {
+                    statusText.innerText = `¡Objeto Detectado!`;
+                    statusText.classList.remove('animate-pulse', 'text-cyan-400');
+                    statusText.classList.add('text-green-400');
+                }
+            }, 1000);
+
+            if (scannerTimeout) clearTimeout(scannerTimeout);
+            scannerTimeout = setTimeout(() => {
+                clearInterval(scannerInterval);
+                confirmScan();
+            }, 10000);
+            
+            // Intenta acceder a la cámara
+            try {
+                const video = document.getElementById('scanner-video');
+                // Buscamos la cámara trasera preferentemente
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = cameraStream;
+            } catch (err) {
+                console.warn("No se pudo acceder a la cámara, simulando escáner virtual: ", err);
+            }
+        }
+
+        function closeScannerPopup() {
+            document.getElementById('scanner-overlay').classList.add('hidden');
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            if (scannerTimeout) clearTimeout(scannerTimeout);
+            if (scannerInterval) clearInterval(scannerInterval);
+        }
+
+        function confirmScan() {
+            // Añade el objeto y detiene la cámara
+            addObject(); 
+            closeScannerPopup();
+        }
+
+        // --- LÓGICA TECLADO POPUP ---
+        function openKeyboardPopup(targetId) {
+            keyboardTargetId = targetId;
+            keyboardValue = document.getElementById(targetId).value; 
+            keyboardCursorPos = keyboardValue.length;
+            
+            if (keyboardValue === "") {
+                isKeyboardUppercase = true;
+            } else {
+                isKeyboardUppercase = false;
+            }
+            
+            updateKeyboardDisplay();
+            renderKeyboardGrid();
+            updateShiftUI(); 
+            document.getElementById('keyboard-overlay').classList.remove('hidden');
+        }
+
+        function closeKeyboardPopup() {
+            document.getElementById('keyboard-overlay').classList.add('hidden');
+        }
+
+        function toggleKeyboardCase() {
+            isKeyboardUppercase = !isKeyboardUppercase;
+            renderKeyboardGrid();
+            updateShiftUI();
+        }
+
+        function updateShiftUI() {
+            const btn = document.getElementById('kb-shift-btn');
+            const icon = document.getElementById('kb-shift-icon');
+            if (isKeyboardUppercase) {
+                btn.style.background = "white";
+                icon.style.color = "#666";
+                btn.classList.add('shadow-inner');
+            } else {
+                btn.style.background = "#333";
+                icon.style.color = "white";
+                btn.classList.remove('shadow-inner');
+            }
+        }
+
+        function renderKeyboardGrid() {
+            const grid = document.getElementById('keyboard-grid');
+            grid.innerHTML = '';
+            KB_CHARS.forEach(char => {
+                const btn = document.createElement('button');
+                btn.className = "kb-key";
+                const displayChar = isKeyboardUppercase ? char : char.toLowerCase();
+                btn.innerText = displayChar;
+                btn.onclick = () => keyboardPress(displayChar);
+                grid.appendChild(btn);
+            });
+        }
+
+        function updateKeyboardDisplay() {
+            const container = document.getElementById('keyboard-display-container');
+            container.innerHTML = '';
+            const fullText = keyboardValue || "";
+            for (let i = 0; i <= fullText.length; i++) {
+                if (keyboardCursorPos === i) {
+                    const cursorSpan = document.createElement('span');
+                    cursorSpan.className = "cursor-active";
+                    container.appendChild(cursorSpan);
+                }
+                if (i < fullText.length) {
+                    const charSpan = document.createElement('span');
+                    charSpan.innerText = fullText[i] === " " ? "\u00A0" : fullText[i];
+                    container.appendChild(charSpan);
+                }
+            }
+        }
+
+        function moveCursor(direction) {
+            if (direction === 'left' && keyboardCursorPos > 0) keyboardCursorPos--;
+            else if (direction === 'right' && keyboardCursorPos < keyboardValue.length) keyboardCursorPos++;
+            updateKeyboardDisplay();
+        }
+
+        function keyboardPress(char) {
+            if (char === 'DEL') {
+                if (keyboardCursorPos > 0) {
+                    keyboardValue = keyboardValue.slice(0, keyboardCursorPos - 1) + keyboardValue.slice(keyboardCursorPos);
+                    keyboardCursorPos--;
+                }
+            } else {
+                if (keyboardValue.length < 24) {
+                    keyboardValue = keyboardValue.slice(0, keyboardCursorPos) + char + keyboardValue.slice(keyboardCursorPos);
+                    keyboardCursorPos++;
+                    
+                    if (isKeyboardUppercase) {
+                        isKeyboardUppercase = false;
+                        renderKeyboardGrid();
+                        updateShiftUI();
+                    }
+                }
+            }
+            updateKeyboardDisplay();
+        }
+
+        function confirmKeyboard() {
+            document.getElementById(keyboardTargetId).value = keyboardValue;
+            closeKeyboardPopup();
+        }
+
+        // --- FUNCIONES AUXILIARES ---
+        function openNumpadPopup(targetId) {
+            numpadPopupTargetId = targetId;
+            numpadPopupValue = '';
+            document.getElementById('numpad-display').innerText = '0';
+            document.getElementById('numpad-overlay').classList.remove('hidden');
+        }
+
+        function closeNumpadPopup() { document.getElementById('numpad-overlay').classList.add('hidden'); }
+        function numpadPopupPress(val) {
+            if (val === 'DEL') numpadPopupValue = numpadPopupValue.slice(0, -1);
+            else if (val === '.') { if (!numpadPopupValue.includes('.')) numpadPopupValue += '.'; }
+            else { if (numpadPopupValue.length < 8) numpadPopupValue += val; }
+            document.getElementById('numpad-display').innerText = numpadPopupValue || '0';
+        }
+        function confirmNumpadPopup() { document.getElementById(numpadPopupTargetId).value = numpadPopupValue; closeNumpadPopup(); }
+
+        // --- FUNCIONES PIN FORM ---
+        function openFormPinNumpad() {
+            updatePinDots('form-pin-overlay-dots', currentFormPinInput);
+            document.getElementById('form-pin-overlay').classList.remove('hidden');
+        }
+        function closeFormPinNumpad() {
+            document.getElementById('form-pin-overlay').classList.add('hidden');
+        }
+
+        function numpadPressPIN(val) {
+            document.getElementById('pin-container').classList.remove('animate-shake');
+            if (val === 'DEL') currentPinInput = currentPinInput.slice(0, -1);
+            else if (currentPinInput.length < 4) currentPinInput += val;
+            updatePinDots('pin-dots-display', currentPinInput);
+            if(currentPinInput.length === 4) setTimeout(verifyPin, 200);
+        }
+
+        function numpadPressForm(val) {
+            if (val === 'DEL') currentFormPinInput = currentFormPinInput.slice(0, -1);
+            else if (currentFormPinInput.length < 4) currentFormPinInput += val;
+            
+            updatePinDots('form-pin-dots-container', currentFormPinInput);
+            updatePinDots('form-pin-overlay-dots', currentFormPinInput);
+        }
+
+        function updatePinDots(containerId, value) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const dots = container.children;
+            for (let i = 0; i < dots.length; i++) {
+                if (i < value.length) {
+                    dots[i].classList.remove('bg-slate-200');
+                    dots[i].classList.add('bg-slate-900');
+                } else {
+                    dots[i].classList.remove('bg-slate-900');
+                    dots[i].classList.add('bg-slate-200');
+                }
+            }
+        }
+
+        function verifyPin() {
+            if (currentPinInput === loginTargetUser.pin) {
+                currentUser = loginTargetUser;
+                document.getElementById('current-user-tag').innerText = currentUser.name;
+                selectedId = currentUser.items.length > 0 ? currentUser.items[0].id : null;
+                showView('dashboard');
+            } else {
+                document.getElementById('pin-container').classList.add('animate-shake');
+                setTimeout(() => { currentPinInput = ""; updatePinDots('pin-dots-display', ""); }, 300);
+            }
+        }
+
+        function renderUserCards() {
+            const grid = document.getElementById('users-grid');
+            grid.innerHTML = '';
+            users.forEach(user => {
+                const card = document.createElement('button');
+                card.onclick = () => { loginTargetUser = user; document.getElementById('pin-user-name').innerText = user.name; showView('pin'); };
+                card.className = "user-card bg-white border-2 border-slate-100 p-6 rounded-[2rem] flex flex-col items-center justify-center transition-all shadow-sm";
+                card.innerHTML = `<div class="text-6xl mb-3">${user.avatar || '👤'}</div><div class="font-bold text-slate-800 text-2xl">${user.name}</div><div class="text-sm text-slate-400 font-bold uppercase mt-1">${user.items.length} objetos</div>`;
+                grid.appendChild(card);
+            });
+        }
+
+        function prepareUserForm(edit) {
+            isEditing = edit;
+            document.getElementById('user-form-title').innerText = edit ? "Editar Perfil" : "Nuevo Perfil";
+            currentFormPinInput = edit ? currentUser.pin : "";
+            if (!edit) { document.getElementById('user-form-name').value = ''; currentFormAvatar = '👤'; }
+            updatePinDots('form-pin-dots-container', currentFormPinInput);
+            
+            showView('user-form');
+            const formView = document.getElementById('view-user-form');
+            if (formView) formView.scrollTop = 0;
+        }
+
+        function renderAvatarGrid() {
+            const grid = document.getElementById('user-avatar-grid');
+            grid.innerHTML = '';
+            AVATAR_LIBRARY.forEach(av => {
+                const btn = document.createElement('button');
+                btn.className = `p-2 text-4xl rounded-xl transition-all ${currentFormAvatar === av ? 'bg-slate-900 text-white' : 'hover:bg-slate-200'}`;
+                btn.innerText = av;
+                btn.onclick = () => { currentFormAvatar = av; renderAvatarGrid(); };
+                grid.appendChild(btn);
+            });
+        }
+
+        function cancelUserForm() { showView(currentUser ? 'dashboard' : 'welcome'); isEditing = false; }
+
+        document.getElementById('user-form-submit').onclick = function() {
+            const name = document.getElementById('user-form-name').value;
+            const pin = currentFormPinInput;
+            if(!name || pin.length < 4) { showModal('Incompleto', 'Nombre y PIN de 4 dígitos obligatorios.', 'fa-circle-exclamation', 'bg-amber-50', 'text-amber-500', 'bg-amber-500', closeModal, 'Entendido'); return; }
+            if(isEditing) {
+                currentUser.name = name; currentUser.pin = pin; currentUser.avatar = currentFormAvatar;
+                document.getElementById('current-user-tag').innerText = currentUser.name;
+                showView('dashboard');
+            } else {
+                users.push({ id: Date.now(), name, pin, avatar: currentFormAvatar, items: [] });
+                showView('welcome');
+            }
+            isEditing = false;
+        };
+
+        function editCurrentUser() { isEditing = true; document.getElementById('user-form-name').value = currentUser.name; currentFormAvatar = currentUser.avatar; toggleUserMenu(); prepareUserForm(true); }
+
+        function confirmDeleteUser() {
+            toggleUserMenu();
+            if(currentUser.items.some(item => item.isMinimized)) showModal('Error Crítico', 'Restaura todos los objetos antes de borrar el perfil.', 'fa-radiation', 'bg-red-50', 'text-red-500', 'bg-red-900', closeModal, 'Regresar');
+            else showModal('Borrar Perfil', '¿Deseas eliminar tu cuenta permanentemente?', 'fa-user-xmark', 'bg-red-50', 'text-red-500', 'bg-red-500', () => { users = users.filter(u => u.id !== currentUser.id); currentUser = null; showView('welcome'); closeModal(); });
+        }
+
+        function toggleUserMenu() { document.getElementById('user-dropdown').classList.toggle('hidden'); }
+        function logout() { currentUser = null; document.getElementById('user-dropdown').classList.add('hidden'); showView('welcome'); }
+
+        function renderObjects() {
+            if (!currentUser) return;
+            const grid = document.getElementById('objects-grid');
+            grid.innerHTML = '';
+            currentUser.items.forEach(obj => {
+                const isSelected = obj.id === selectedId;
+                const currentMass = obj.isMinimized ? obj.originalMass * MASS_REDUCTION_FACTOR : obj.originalMass;
+                
+                let massText;
+                // Verificamos el peso ORIGINAL del objeto, no el peso actual
+                if (obj.originalMass < 1) {
+                    massText = `${(currentMass * 1000).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 4 })} g`;
+                } else {
+                    // Restauramos hasta 4 decimales para que los kg reducidos se vean bien (ej. 85kg -> 0.085 kg)
+                    massText = `${currentMass.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} kg`;
+                }
+
+                const btn = document.createElement('button');
+                btn.onclick = () => { selectedId = obj.id; renderObjects(); };
+                btn.className = `text-left p-4 rounded-2xl transition-all border ${isSelected ? 'bg-white border-slate-300 shadow-xl ring-2 ring-slate-200 -translate-y-1' : 'bg-white/70 border-slate-100 hover:bg-white'}`;
+                btn.innerHTML = `<div class="flex items-center justify-between mb-3"><span class="text-5xl bg-slate-50 w-12 h-12 flex items-center justify-center rounded-xl shadow-inner">${obj.icon}</span><div class="px-2 py-0.5 rounded-full text-xs font-extrabold uppercase tracking-widest ${obj.isMinimized ? 'bg-cyan-100 text-cyan-700' : 'bg-green-100 text-green-700'}">${obj.isMinimized ? 'Reducido' : 'Original'}</div></div><h4 class="font-bold text-slate-800 text-xl truncate">${obj.name}</h4><p class="text-base text-slate-600 mono mt-1 font-bold">${massText}</p>`;
+                grid.appendChild(btn);
+            });
+        }
+
+        function handleAction(type) {
+            if (!isOn || !currentUser) return;
+            const obj = currentUser.items.find(o => o.id === selectedId);
+            if (!obj) return;
+            if (type === 'maximize' && obj.isMinimized) {
+                openRestorePopup(obj);
+            } else if (type === 'minimize' && !obj.isMinimized) { 
+                obj.isMinimized = true; renderObjects(); 
+            }
+        }
+
+        // --- LÓGICA RESTAURAR (CÁMARA Y HOLOGRAMA) ---
+        async function openRestorePopup(obj) {
+            objectToRestore = obj;
+            document.getElementById('restore-overlay').classList.remove('hidden');
+            
+            const hologram = document.getElementById('restore-hologram');
+            hologram.innerText = obj.icon;
+            
+            // Calcular escala según la masa original (logarítmico para mantenerlo en pantalla)
+            // Valores estimados: 1kg=~1.5x, 10kg=~2.7x, 100kg=~3.9x, 1000kg=~5.1x
+            const massScale = Math.max(1, Math.log10(Math.max(1, obj.originalMass)) * 1.2 + 1.5);
+            hologram.style.setProperty('--target-scale', massScale);
+            
+            // Reiniciar animación del holograma para que crezca
+            hologram.classList.remove('animate-hologram');
+            void hologram.offsetWidth; // Forzar un "reflow" para reiniciar CSS animation
+            hologram.classList.add('animate-hologram');
+
+            // Intenta acceder a la cámara
+            try {
+                const video = document.getElementById('restore-video');
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = cameraStream;
+            } catch (err) {
+                console.warn("No se pudo acceder a la cámara para restaurar: ", err);
+            }
+        }
+
+        function closeRestorePopup() {
+            document.getElementById('restore-overlay').classList.add('hidden');
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            objectToRestore = null;
+        }
+
+        function confirmRestore() {
+            if (objectToRestore) {
+                objectToRestore.isMinimized = false;
+                renderObjects();
+            }
+            closeRestorePopup();
+        }
+
+        function toggleAddView(show) {
+            if (show && (!currentUser || !isOn)) return;
+            document.getElementById('add-view').classList.toggle('hidden', !show);
+            if (show) { renderEmojiGrid(); const addView = document.getElementById('add-view'); if (addView) addView.scrollTop = 0; }
+        }
+
+        function renderEmojiGrid() {
+            const grid = document.getElementById('emoji-grid');
+            grid.innerHTML = '';
+            EMOJI_LIBRARY.forEach(emoji => {
+                const btn = document.createElement('button');
+                btn.className = `text-4xl p-2 rounded-xl transition-all ${currentIcon === emoji ? 'bg-slate-900 text-white' : 'hover:bg-white'}`;
+                btn.innerText = emoji;
+                btn.onclick = () => { currentIcon = emoji; renderEmojiGrid(); };
+                grid.appendChild(btn);
+            });
+        }
+
+        function addObject() {
+            const name = document.getElementById('new-name').value;
+            if (!name) return;
+            
+            // Obtener el rango de masa (mínimo y máximo) según el icono seleccionado
+            // Si el icono no se encuentra por algún motivo, usa un rango genérico [0.5, 100]
+            const massRange = emojiMassRanges[currentIcon] || [0.5, 100];
+            const minMass = massRange[0];
+            const maxMass = massRange[1];
+            
+            // La masa se calcula aleatoriamente dentro del baremo lógico del objeto
+            const autoMass = parseFloat((Math.random() * (maxMass - minMass) + minMass).toFixed(2));
+            
+            currentUser.items.unshift({ id: Date.now(), name, isMinimized: false, originalMass: autoMass, icon: currentIcon });
+            selectedId = currentUser.items[0].id;
+            document.getElementById('new-name').value = '';
+            toggleAddView(false); renderObjects();
+        }
+
+        function confirmDeleteObject() {
+            if(!currentUser) return;
+            const obj = currentUser.items.find(o => o.id === selectedId);
+            if (!obj || obj.isMinimized) showModal('Seguridad', 'Restaura el objeto antes de borrar.', 'fa-info', 'bg-slate-50', 'text-slate-400', 'bg-slate-900', closeModal, 'OK');
+            else showModal('Borrar Objeto', '¿Deseas eliminar este registro?', 'fa-circle-exclamation', 'bg-red-50', 'text-red-500', 'bg-red-500', () => { currentUser.items = currentUser.items.filter(o => o.id !== selectedId); selectedId = currentUser.items.length > 0 ? currentUser.items[0].id : null; renderObjects(); closeModal(); });
+        }
+
+        function togglePower() {
+            isOn = !isOn;
+            const screen = document.getElementById('screen');
+            const powerIcon = document.getElementById('power-icon');
+            const powerBtn = document.getElementById('power-button');
+            const indicators = document.querySelectorAll('.indicator');
+            if (isOn) {
+                screen.classList.replace('bg-black', 'bg-slate-50');
+                powerIcon.classList.replace('text-white/20', 'text-white');
+                powerBtn.classList.replace('bg-[#1a2126]', 'bg-[#2a343c]');
+                indicators.forEach(i => i.classList.replace('bg-black/30', 'bg-cyan-500/30'));
+                showView('welcome');
+            } else {
+                screen.classList.replace('bg-slate-50', 'bg-black');
+                powerIcon.classList.replace('text-white', 'text-white/20');
+                powerBtn.classList.replace('bg-[#2a343c]', 'bg-[#1a2126]');
+                indicators.forEach(i => i.classList.replace('bg-cyan-500/30', 'bg-black/30'));
+                
+                // CLEANUP: Apaga todo forzosamente limpiando memoria y popups
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                    cameraStream = null;
+                }
+                if (scannerTimeout) clearTimeout(scannerTimeout);
+                if (scannerInterval) clearInterval(scannerInterval);
+                
+                ['add-view', 'scanner-overlay', 'restore-overlay', 'numpad-overlay', 'form-pin-overlay', 'keyboard-overlay', 'modal-confirm'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.add('hidden');
+                });
+
+                isEditing = false;
+                currentUser = null;
+                loginTargetUser = null;
+                selectedId = null;
+                currentPinInput = '';
+                currentFormPinInput = '';
+                numpadPopupValue = '';
+                keyboardValue = '';
+                objectToRestore = null;
+                
+                document.getElementById('new-name').value = '';
+                document.getElementById('user-form-name').value = '';
+                document.getElementById('numpad-display').innerText = '0';
+                
+                updatePinDots('pin-dots-display', '');
+                updatePinDots('form-pin-dots-container', '');
+                updatePinDots('form-pin-overlay-dots', '');
+
+                showView('off');
+            }
+        }
+
+        function showModal(title, desc, icon, iconBg, iconColor, btnBg, onConfirm, confirmText = 'Confirmar') {
+            const modal = document.getElementById('modal-confirm');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerHTML = desc;
+            document.getElementById('modal-icon').className = `fa-solid ${icon} text-5xl ${iconColor}`;
+            document.getElementById('modal-icon-container').className = `w-16 h-16 ${iconBg} rounded-2xl flex items-center justify-center mb-5 mx-auto`;
+            const primaryBtn = document.getElementById('modal-primary-btn');
+            primaryBtn.className = `w-full ${btnBg} text-white py-3.5 rounded-2xl font-bold text-base shadow-lg`;
+            primaryBtn.innerText = confirmText;
+            primaryBtn.onclick = onConfirm;
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('modal-confirm').classList.add('hidden'); }
+    </script>
+</body>
+</html>
